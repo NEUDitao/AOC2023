@@ -1,84 +1,111 @@
-use itertools::Itertools;
-
 use crate::{Solution, SolutionPair};
-use std::{collections::BTreeMap, fs::read_to_string};
+use std::fs::read_to_string;
 
 ///////////////////////////////////////////////////////////////////////////////
+
+// fn trace_through_maps(init_seed: u64, maps: &Vec<BTreeMap<u64, u64>>) -> u64 {
+//     let mut seed_loc = init_seed;
+//     for map in maps {
+//         let maybe_new_seed_loc = map.get(&seed_loc);
+//         if let Some(new_seed_loc) = maybe_new_seed_loc {
+//             seed_loc = *new_seed_loc;
+//         }
+//     }
+//     seed_loc
+// }
+
+fn trace_through_maps(init_seed: u64, maps: &Vec<Vec<(u64, u64, u64)>>) -> u64 {
+    let mut curr_seed = init_seed;
+    for row_map in maps {
+        for row in row_map {
+            let (dest_start, source_start, range) = row;
+            if source_start <= &curr_seed && curr_seed < source_start + range {
+                let diff = curr_seed - source_start;
+                curr_seed = dest_start + diff;
+                break;
+            }
+        }
+    }
+    curr_seed
+}
 
 pub fn solve() -> SolutionPair {
     let input: String = read_to_string("input/day05").unwrap();
     let mut rows = input.split('\n');
 
-    let towers = rows
-        .by_ref()
-        .take_while(|&line| !line.is_empty())
+    let seeds = rows.next().unwrap().split_whitespace();
+    let seeds = seeds
+        .into_iter()
+        .filter_map(|seed| {
+            if seed == "seeds:" {
+                None
+            } else {
+                Some(seed.parse::<u64>().unwrap())
+            }
+        })
         .collect::<Vec<_>>();
-    let rest = rows.collect::<Vec<_>>();
 
-    // let num_towers: u32 = char::to_digit(
-    //     towers
-    //         .last()
-    //         .unwrap()
-    //         .split("   ")
-    //         .last()
-    //         .unwrap()
-    //         .chars()
-    //         .next()
-    //         .unwrap(),
-    //     10,
-    // )
-    // .unwrap();
+    let mut maps = Vec::new();
+    rows.next();
 
-    let mut towers = towers.split_last().unwrap().1.to_owned();
-    towers.reverse();
+    for _ in 0..7 {
+        // x to y map
+        rows.next();
 
-    let mut hanoi: BTreeMap<i32, Vec<char>> = BTreeMap::new();
+        let mut row_maps = Vec::new();
 
-    for row in towers {
-        for (idx, mut chunk) in row.chars().chunks(4).into_iter().enumerate() {
-            let second_char = chunk.nth(1).unwrap();
-            if second_char != ' ' {
-                hanoi
-                    .entry(i32::try_from(idx).unwrap() + 1)
-                    .or_default()
-                    .push(second_char);
+        loop {
+            let row = rows.next();
+            if let Some(row) = row {
+                if row == "" {
+                    break;
+                }
+                let mut row = row.split_whitespace().map(|n| n.parse::<u64>().unwrap());
+                row_maps.push((
+                    row.next().unwrap(),
+                    row.next().unwrap(),
+                    row.next().unwrap(),
+                ));
+            } else {
+                break;
+            }
+        }
+
+        maps.push(row_maps);
+        // let map = solve_shit(row_maps);
+        // maps.push(map);
+    }
+    let sol1 = seeds
+        .clone()
+        .into_iter()
+        .map(|seed| trace_through_maps(seed, &maps))
+        .min()
+        .unwrap();
+
+    let mut min_seen_so_far: u64 = u64::MAX;
+
+    for seed in seeds.chunks(2) {
+        println!("one iter");
+        for s in seed[0]..seed[0] + seed[1] {
+            let ans = trace_through_maps(s, &maps);
+            if ans < min_seen_so_far {
+                min_seen_so_far = ans;
             }
         }
     }
+    let sol2 = min_seen_so_far;
 
-    // let hanoi = hanoi
-    //     .into_iter()
-    //     .map(|(i, mut tower)| {
-    //         tower.reverse();
-    //         (i, tower)
-    //     })
-    //     .collect::<BTreeMap<_, _>>();
-
-    for instruction in rest {
-        let words = instruction.split(' ').collect::<Vec<_>>();
-        let num = str::parse::<usize>(words[1]).unwrap();
-        let from = str::parse::<i32>(words[3]).unwrap();
-        let to = str::parse::<i32>(words[5]).unwrap();
-
-        let tower_from = hanoi.get_mut(&from).unwrap();
-        let split_location = tower_from.len() - num;
-
-        let mut takeaway = tower_from.split_off(split_location);
-        // takeaway.reverse();
-
-        let tower_to = hanoi.get_mut(&to).unwrap();
-        tower_to.append(&mut takeaway);
-    }
-
-    println!("{:?}", hanoi);
-
-    for values in hanoi.into_values() {
-        println!("{:?}", values.last().unwrap());
-    }
+    // let seeds = seeds
+    //     .chunks(2)
+    //     .flat_map(|chunk| (chunk[0]..chunk[0] + chunk[1]))
+    //     .collect::<Vec<u64>>();
 
     // Your solution here...
-    let sol1: u64 = 0;
-    let sol2: u64 = 0;
+    // let sol2: u64 = seeds
+    //     .into_iter()
+    //     .map(|seed| trace_through_maps(seed, &maps))
+    //     .min()
+    //     .unwrap();
 
     (Solution::from(sol1), Solution::from(sol2))
 }
